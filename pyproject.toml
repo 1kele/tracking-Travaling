@@ -1,0 +1,25 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "FastAPI backend for planning and tracking trips"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "asyncpg>=0.32.0",
+    "fastapi>=0.163.1",
+    "pydantic>=2.14.3",
+    "pydantic-settings>=2.16.3",
+    "sqlalchemy[asyncio]>=2.1.8",
+    "uvicorn>=0.54.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.7,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "aiosqlite>=0.22.1",
+    "httpx2>=2.16.2",
+    "pytest>=9.2.0",
+]
