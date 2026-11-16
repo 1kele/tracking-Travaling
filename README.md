@@ -23,7 +23,7 @@ URL подключения. Git игнорирует локальный `.env`. 
 
 - `src/backend/app.py` — экземпляр FastAPI. Роутеры подключаются здесь.
 - `src/backend/config.py` — настройки из окружения и `.env`.
-- `src/backend/database.py` — async engine, фабрика сессий, `SessionDep` и `Base`.
+- `src/backend/database.py` — async engine, фабрика сессий и `SessionDep`.
 - `src/backend/routers/` — HTTP-обработчики.
 - `src/backend/models/` — модели SQLAlchemy.
 - `src/backend/schemas/` — схемы Pydantic.
