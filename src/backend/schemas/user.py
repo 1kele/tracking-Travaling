@@ -1,13 +1,11 @@
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, SecretStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, SecretStr, StringConstraints
 
 
 class UserCreate(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True)
-
     email: EmailStr = Field(max_length=254)
-    name: str = Field(min_length=1, max_length=120)
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
     password: SecretStr = Field(min_length=12, max_length=128)
 
 

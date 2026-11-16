@@ -1,17 +1,26 @@
 from collections.abc import AsyncIterator
+from functools import lru_cache
 from typing import Annotated
 
-from fastapi import Depends
+from fastapi import Depends, HTTPException
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from backend.config import Settings
 
-engine = create_async_engine(Settings().get_db_url())
-async_session_maker = async_sessionmaker(engine, expire_on_commit=False)
+@lru_cache
+def get_session_factory() -> async_sessionmaker[AsyncSession]:
+    try:
+        url = Settings().get_db_url()
+    except ValidationError:
+        raise HTTPException(status_code=503, detail="Database is not configured") from None
+    engine = create_async_engine(url, pool_pre_ping=True)
+    return async_sessionmaker(engine, expire_on_commit=False)
 
 
 async def get_session() -> AsyncIterator[AsyncSession]:
-    async with async_session_maker() as session:
+    session_factory = get_session_factory()
+    async with session_factory() as session:
         yield session
 
 

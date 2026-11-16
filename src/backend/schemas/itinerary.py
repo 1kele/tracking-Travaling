@@ -4,7 +4,7 @@ from backend.models import ItemStatus
 
 
 class ItineraryItemCreate(BaseModel):
-    place_id: int = Field(gt=0)
+    place_id: int = Field(gt=0, le=2_147_483_647)
     position: int = Field(ge=1, le=2_147_483_647)
     planned_time: AwareDatetime | None = None
 

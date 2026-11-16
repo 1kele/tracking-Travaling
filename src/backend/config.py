@@ -26,3 +26,9 @@ class Settings(BaseSettings):
             port=self.DB_PORT,
             database=self.DB_NAME,
         )
+
+
+class AuthSettings(BaseSettings):
+    model_config = Settings.model_config
+
+    JWT_SECRET: SecretStr | None = Field(default=None, min_length=32)

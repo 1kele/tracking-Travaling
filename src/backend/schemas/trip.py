@@ -9,7 +9,7 @@ from backend.models import TripStatus
 class TripCreate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    city_id: int = Field(gt=0)
+    city_id: int = Field(gt=0, le=2_147_483_647)
     title: str = Field(min_length=1, max_length=160)
     start_date: date
     end_date: date
