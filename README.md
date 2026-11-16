@@ -19,6 +19,11 @@ Swagger UI доступен на http://127.0.0.1:8000/docs.
 URL подключения. Git игнорирует локальный `.env`. Приложение и Swagger
 доступны с пустым шаблоном. Параметры БД нужны при импорте `backend.database`.
 
+## Миграции
+
+После заполнения `.env` выполни `uv run alembic upgrade head`. Для просмотра
+SQL начальной миграции можно выполнить `uv run alembic upgrade head --sql`.
+
 ## Структура
 
 - `src/backend/app.py` — экземпляр FastAPI. Роутеры подключаются здесь.
