@@ -64,7 +64,8 @@ function toTrip(trip) {
     startDate: trip.start_date,
     endDate: trip.end_date,
     status: trip.status === 'in_progress' ? 'active' : trip.status,
-    items: []
+    items: [],
+    stats: { total: 0, visited: 0, percent: 0 }
   };
 }
 
@@ -93,6 +94,9 @@ export const api = {
   async trips() {
     return (await list('/trips')).map(toTrip);
   },
+  async trip(id) {
+    return toTrip(await request(`/trips/${id}`));
+  },
   async createTrip({ title, cityId, startDate, endDate }) {
     const trip = await request('/trips', {
       method: 'POST',
@@ -110,6 +114,8 @@ export const api = {
   deleteItem: (tripId, itemId) => request(`/trips/${tripId}/items/${itemId}`, {
     method: 'DELETE'
   }),
+  progress: (tripId) => request(`/trips/${tripId}/progress`),
+  visit: (tripId, itemId) => request(`/trips/${tripId}/items/${itemId}/visit`),
   markVisit: (tripId, itemId) => request(`/trips/${tripId}/items/${itemId}/visit`, {
     method: 'PUT', body: {}
   })
