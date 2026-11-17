@@ -38,9 +38,10 @@ async function request(path, { method = 'GET', body, authenticated = true } = {}
       422: 'Проверьте введённые данные.',
       503: 'Сервис пока недоступен. Попробуйте позже.'
     };
-    if (data?.detail === 'Email already registered') messages[409] = 'Эта почта уже зарегистрирована.';
+    if (data?.detail === 'Email already registered') messages[409] = 'Эта почта уже зарегистрирована. Войдите с этим адресом.';
     const error = new Error(messages[response.status] || 'Сервер не смог выполнить запрос.');
     error.status = response.status;
+    error.validation = Array.isArray(data?.detail) ? data.detail : [];
     throw error;
   }
   if (data === null) throw new Error('Сервер вернул неожиданный ответ.');

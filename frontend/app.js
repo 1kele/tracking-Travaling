@@ -157,14 +157,11 @@ import { api, clearSession, hasSession } from './api.js';
           <h4>${esc(place.name)}</h4><p>${esc(place.desc)}</p>
           ${item.visit ? `<p class="visit-detail">Посещено ${visitDate.format(new Date(item.visit.visited_at))}
             ${item.visit.rating === null ? '' : ` · Оценка ${esc(item.visit.rating)}/5`}</p>` : ''}
-          <div class="stop-bottom"><a href="https://www.openstreetmap.org/?mlat=${place.lat}&mlon=${place.lon}#map=16/${place.lat}/${place.lon}"
-             target="_blank" rel="noopener noreferrer">На карте ${icon('external', 13)}</a></div>
         </div>
       </article>`;
     }).join('');
-    const mapPath=trip.items.map(item=>placeById(city,item.placeId)).filter(Boolean).map(p=>`${p.x},${p.y}`).join(' ');
     const content=`<button class="back-link" data-action="nav" data-page="trips">${icon('arrowLeft',17)} Все поездки</button><div class="planner-banner"><div><span>${esc(city.emoji)} ${esc(city.country)} · ${displayDate(trip.startDate)} – ${displayDate(trip.endDate)}</span><h2>${esc(trip.title)}</h2><p>${dayCount(trip.startDate,trip.endDate)} дн. · ${trip.items.length} мест · ${complete} посещено</p></div><div class="planner-banner-actions"><button class="btn btn-lightoutline" data-action="confirm-delete">${icon('trash',16)} Удалить</button></div></div><div class="planner-layout"><div class="planner-left"><section class="panel route-panel"><div class="panel-head"><div><span class="eyebrow">ТВОЙ ПЛАН</span><h3>Маршрут по городу</h3></div><span class="small-count">${trip.items.length} остановок</span></div><div class="route-timeline">${routeItems||'<div class="empty-state small">В маршруте пока нет мест. Добавьте первую остановку ниже.</div>'}</div><div class="add-stop"><div><strong>Добавить остановку</strong><small>Выберите место из каталога</small></div><button class="small-add" data-action="add-place" ${!available.length?'disabled':''}>${icon('plus',17)} Добавить</button></div></section><section class="panel recommendations"><div class="panel-head"><div><span class="eyebrow">ИДЕИ ДЛЯ ВАС</span><h3>Места неподалёку</h3></div></div><div class="rec-list">${available.length?available.slice(0,3).map(p=>`<div class="rec-row"><span class="rec-emoji">${p.kind==='Музей'?'🏛️':p.kind==='Прогулка'?'🌿':'📍'}</span><div><strong>${esc(p.name)}</strong><small>${esc(p.kind)}</small></div><button data-action="quick-add" data-place="${esc(p.id)}" aria-label="Добавить ${esc(p.name)}">${icon('plus',17)}</button></div>`).join(''):'<p class="muted-empty">Все доступные места уже добавлены.</p>'}</div></section></div>
-    <div class="planner-right"><section class="panel map-panel"><div class="panel-head"><div><span class="eyebrow">ВИЗУАЛИЗАЦИЯ</span><h3>Карта маршрута</h3></div><span class="map-pill">${icon('map',14)} Схема</span></div><div class="schematic-map"><div class="map-water"></div><div class="map-highway highway-a"></div><div class="map-highway highway-b"></div><div class="map-highway highway-c"></div><div class="map-park park-a"></div><div class="map-park park-b"></div><div class="map-block block-a"></div><div class="map-block block-b"></div><div class="map-block block-c"></div><div class="map-block block-d"></div><svg class="map-route-line" preserveAspectRatio="none" viewBox="0 0 100 100">${mapPath?`<polyline points="${mapPath}" stroke="#db6749" stroke-width="1.45" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 1"/>`:''}</svg>${trip.items.map((item,i)=>{const p=placeById(city,item.placeId);return p?`<span class="map-pin ${item.visited?'done':''}" style="left:${p.x}%;top:${p.y}%" title="${esc(p.name)}">${item.visited?icon('check',13):i+1}</span>`:'';}).join('')}<div class="map-caption">${icon('pin',15)} ${esc(city.name)}</div></div><p class="map-disclaimer">Условная схема порядка остановок, не географическая навигация.</p><a class="map-external" href="https://www.openstreetmap.org/#map=12/${city.lat}/${city.lon}" target="_blank" rel="noopener noreferrer">Открыть карту ${esc(city.name)} ${icon('external',15)}</a></section><section class="panel progress-panel"><div class="panel-head"><div><span class="eyebrow">ДВИГАЙСЯ ВПЕРЁД</span><h3>Прогресс поездки</h3></div><strong class="large-percent">${progress(trip)}%</strong></div><div class="progress-track big"><span style="width:${progress(trip)}%"></span></div><div class="progress-summary"><span>${icon('circleCheck',17)} ${complete} посещено</span><span>${trip.stats.total-complete} осталось</span></div>${progress(trip)===100&&trip.items.length?'<p class="completion-note">✦ Отлично! Все места из маршрута посещены.</p>':''}</section></div></div>`;
+    <div class="planner-right"><section class="panel progress-panel"><div class="panel-head"><div><span class="eyebrow">ДВИГАЙСЯ ВПЕРЁД</span><h3>Прогресс поездки</h3></div><strong class="large-percent">${progress(trip)}%</strong></div><div class="progress-track big"><span style="width:${progress(trip)}%"></span></div><div class="progress-summary"><span>${icon('circleCheck',17)} ${complete} посещено</span><span>${trip.stats.total-complete} осталось</span></div>${progress(trip)===100&&trip.items.length?'<p class="completion-note">✦ Отлично! Все места из маршрута посещены.</p>':''}</section></div></div>`;
     renderShell(content,'Мой маршрут','ПЛАНИРОВАНИЕ ПОЕЗДКИ');
   }
 
@@ -221,15 +218,19 @@ import { api, clearSession, hasSession } from './api.js';
     const registration = state.authMode === 'register';
     const title = registration ? 'Создать аккаунт' : 'Войти в Tripline';
     const passwordLabel = registration ? 'Пароль (от 12 символов)' : 'Пароль';
+    const fieldError = (name) => `<span id="auth-${name}-error" class="form-error" role="alert" hidden></span>`;
     document.title = `${title} — Tripline`;
     root.innerHTML = `<main class="auth-page"><section class="auth-card panel">
       <div class="auth-brand"><span class="brand-icon">${icon('plane', 24)}</span>Tripline</div>
       <h1>${title}</h1>
       <form id="auth-form" class="form-stack">
-        ${registration ? '<label>Имя<input name="name" autocomplete="name" maxlength="120" required></label>' : ''}
-        <label>Электронная почта<input name="email" type="email" autocomplete="username" maxlength="254" required></label>
+        ${registration ? `<label>Имя<input name="name" autocomplete="name" maxlength="120" aria-describedby="auth-name-error" required>
+            ${fieldError('name')}</label>` : ''}
+        <label>Электронная почта<input name="email" type="email" autocomplete="username" maxlength="254" aria-describedby="auth-email-error" required>
+          ${fieldError('email')}</label>
         <label>${passwordLabel}<input name="password" type="password" autocomplete="${registration ? 'new-password' : 'current-password'}"
-           maxlength="128" ${registration ? 'minlength="12"' : ''} required></label>
+           maxlength="128" aria-describedby="auth-password-error" ${registration ? 'minlength="12"' : ''} required>
+          ${fieldError('password')}</label>
         <p class="form-error" role="alert" ${state.authError ? '' : 'hidden'}>${esc(state.authError)}</p>
         <button type="submit" class="btn btn-primary">${registration ? 'Зарегистрироваться' : 'Войти'}</button>
       </form>
@@ -282,16 +283,11 @@ import { api, clearSession, hasSession } from './api.js';
   }
 
   function formatPlaces(places) {
-    if (!places.length) return [];
-    const bounds = places.reduce((box, place) => ({
-      minLon: Math.min(box.minLon, place.lon), maxLon: Math.max(box.maxLon, place.lon),
-      minLat: Math.min(box.minLat, place.lat), maxLat: Math.max(box.maxLat, place.lat)
-    }), { minLon: Infinity, maxLon: -Infinity, minLat: Infinity, maxLat: -Infinity });
-    const scale = (coordinate, min, max) => min === max ? 50 : 18 + (coordinate - min) * 64 / (max - min);
     return places.map(place => ({
-      id: String(place.id), name: place.name, kind: place.category, desc: place.address,
-      lat: place.lat, lon: place.lon, x: scale(place.lon, bounds.minLon, bounds.maxLon),
-      y: 100 - scale(place.lat, bounds.minLat, bounds.maxLat)
+      id: String(place.id),
+      name: place.name,
+      kind: place.category,
+      desc: place.address
     }));
   }
 
@@ -428,9 +424,43 @@ import { api, clearSession, hasSession } from './api.js';
   }
 
   function showFormError(form, message) {
-    const error = form.querySelector('.form-error');
+    const error = form.querySelector('p.form-error');
     error.textContent = message;
     error.hidden = false;
+  }
+
+  function setAuthMode(mode, email, message = '') {
+    state.authMode = mode;
+    state.authError = message;
+    renderAuth();
+    const form = root.querySelector('#auth-form');
+    form.elements.email.value = email;
+    const field = mode === 'register' ? form.elements.name : form.elements.password;
+    field.focus();
+  }
+
+  function showAuthError(form, error) {
+    const messages = {
+      name: 'Введите имя длиной до 120 символов.',
+      email: 'Укажите корректный адрес электронной почты, например name@example.com.',
+      password: state.authMode === 'register'
+        ? 'Введите пароль длиной от 12 до 128 символов.'
+        : 'Введите пароль длиной до 128 символов.'
+    };
+    const invalid = new Set((error.validation || []).map(detail => detail.loc?.at(-1)));
+    let firstInput;
+    for (const [name, message] of Object.entries(messages)) {
+      if (!invalid.has(name)) continue;
+      const input = form.elements.namedItem(name);
+      const hint = form.querySelector(`#auth-${name}-error`);
+      if (!input || !hint) continue;
+      input.setAttribute('aria-invalid', 'true');
+      hint.textContent = message;
+      hint.hidden = false;
+      firstInput ||= input;
+    }
+    if (firstInput) firstInput.focus();
+    else showFormError(form, error.message);
   }
 
   function exportTrips() {
@@ -453,10 +483,10 @@ import { api, clearSession, hasSession } from './api.js';
       const trip = selectedTrip();
       switch (action) {
         case 'switch-auth':
-          state.authMode = state.authMode === 'login' ? 'register' : 'login';
-          state.authError = '';
-          render();
-          root.querySelector('#auth-form input')?.focus();
+          setAuthMode(
+            state.authMode === 'login' ? 'register' : 'login',
+            root.querySelector('#auth-form').elements.email.value
+          );
           break;
         case 'logout':
           history.replaceState(null, '', window.location.pathname);
@@ -538,15 +568,23 @@ import { api, clearSession, hasSession } from './api.js';
     const label = submit.textContent;
     submit.disabled = true;
     submit.textContent = 'Подождите…';
-    form.querySelector('.form-error').hidden = true;
+    for (const message of form.querySelectorAll('.form-error')) message.hidden = true;
+    for (const input of form.querySelectorAll('[aria-invalid]')) input.removeAttribute('aria-invalid');
     try {
       if (form.id === 'auth-form') {
         const email = fields.get('email').trim();
         const password = fields.get('password');
-        if (state.authMode === 'register') {
+        const registering = state.authMode === 'register';
+        if (registering) {
           await api.register({ email, password, name: fields.get('name').trim() });
         }
-        await api.login(email, password);
+        try {
+          await api.login(email, password);
+        } catch (error) {
+          if (!registering) throw error;
+          setAuthMode('login', email, `Аккаунт создан. Автоматический вход не удался. ${error.message}`);
+          return;
+        }
         await loadWorkspace();
       } else {
         const { cityId, startDate, endDate, title } = Object.fromEntries(fields);
@@ -561,7 +599,8 @@ import { api, clearSession, hasSession } from './api.js';
         notify('Поездка создана');
       }
     } catch (error) {
-      if (form.id === 'trip-form' && error.status === 401) signOut(error.message);
+      if (form.id === 'auth-form') showAuthError(form, error);
+      else if (error.status === 401) signOut(error.message);
       else showFormError(form, error.message);
     } finally {
       submit.disabled = false;
