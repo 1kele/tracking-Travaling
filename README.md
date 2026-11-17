@@ -1,6 +1,6 @@
 # tracking-Travaling
 
-Бэкенд сервиса планирования поездок на FastAPI. Нужны Python 3.12 и uv.
+Сервис планирования поездок на FastAPI и JavaScript. Нужны Python 3.12 и uv.
 
 ## Локальный запуск
 
@@ -12,7 +12,11 @@ uv sync --locked
 uv run uvicorn backend.app:app --reload
 ```
 
-Swagger UI доступен на http://127.0.0.1:8000/docs.
+Сайт доступен на http://127.0.0.1:8000/, Swagger UI — на http://127.0.0.1:8000/docs.
+FastAPI раздаёт фронтенд и API с одного адреса. На сайте можно зарегистрироваться,
+войти и сохранить поездку, её маршрут и посещения в PostgreSQL. Если в базе уже
+создан локальный демоаккаунт, используй его данные из `.env.demo`.
+Каталог может быть пустым после первой миграции. Пример заполнения ниже.
 
 Для работы с PostgreSQL заполни `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`
 и `DB_PASS` в локальном `.env`. `config.py` читает эти параметры и собирает
@@ -66,7 +70,7 @@ FROM city;
 - `src/backend/models/` — модели SQLAlchemy.
 - `src/backend/schemas/` — схемы Pydantic.
 - `src/backend/repositories/` — место для запросов к базе.
-- `src/frontend/` — место для будущего фронтенда.
+- `frontend/` — интерфейс сайта и клиент для API.
 - `tests/` — тесты Swagger и конфигурации базы.
 
 Зависимости добавляются через `uv add <пакет>`, тестовые зависимости —
