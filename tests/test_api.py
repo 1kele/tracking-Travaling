@@ -239,3 +239,41 @@ def test_notes_ownership_validation_and_cascade(api):
     client.post(path, headers=owner, json={"text": "Cascade"})
     assert client.delete(f"trips/{trip['id']}", headers=owner).status_code == 204
     assert client.get(path, headers=owner).status_code == 404
+
+
+def test_admin_catalog_permissions_validation_and_references(api):
+    client, (city_id, place_id, _), sessions = api
+    from sqlalchemy import update
+    admin = login_as(client, "admin@example.com")
+    ordinary = login_as(client, "ordinary@example.com")
+    body = {"name": "New City", "country": "Russia", "lat": 55.0, "lon": 49.0}
+    assert client.post("admin/cities", headers=ordinary, json=body).status_code == 403
+
+    async def promote():
+        async with sessions.begin() as session:
+            await session.execute(update(User).where(User.email == "admin@example.com").values(is_admin=True))
+
+    asyncio.run(promote())
+    invalid = client.post("admin/cities", headers=admin, json=body | {"lat": 91})
+    assert invalid.status_code == 422
+    city = client.post("admin/cities", headers=admin, json=body)
+    assert city.status_code == 201, city.text
+    assert client.post("admin/cities", headers=admin, json=body).status_code == 409
+    new_id = city.json()["id"]
+    path = f"admin/cities/{new_id}"
+    assert client.patch(path, headers=admin, json={"name": "Renamed"}).status_code == 200
+    place_data = {"name": "Park", "category": "park", "address": "Street", "lat": 55.0, "lon": 49.0}
+    place = client.post(f"{path}/places", headers=admin, json=place_data)
+    assert place.status_code == 201, place.text
+    assert client.delete(path, headers=admin).status_code == 409
+    place_path = f"{path}/places/{place.json()['id']}"
+    assert client.patch(place_path, headers=admin, json={"address": "New address"}).status_code == 200
+    assert client.delete(place_path, headers=admin).status_code == 204
+    assert client.delete(path, headers=admin).status_code == 204
+
+    trip = client.post("trips", headers=ordinary, json={
+        "city_id": city_id, "title": "Referenced", "start_date": "2026-12-04", "end_date": "2026-12-06",
+    }).json()
+    client.post(f"trips/{trip['id']}/items", headers=ordinary, json={"place_id": place_id, "position": 1})
+    assert client.delete(f"admin/cities/{city_id}", headers=admin).status_code == 409
+    assert client.delete(f"admin/cities/{city_id}/places/{place_id}", headers=admin).status_code == 409
