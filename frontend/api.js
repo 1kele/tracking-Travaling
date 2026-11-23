@@ -9,7 +9,7 @@ export function clearSession() {
   sessionStorage.removeItem(tokenKey);
 }
 
-async function request(path, { method = 'GET', body, authenticated = true } = {}) {
+async function request(path, { method = 'GET', body, authenticated = true, timeout = 12000 } = {}) {
   const headers = new Headers({ Accept: 'application/json' });
   const token = authenticated && sessionStorage.getItem(tokenKey);
   if (token) headers.set('Authorization', `Bearer ${token}`);
@@ -21,7 +21,7 @@ async function request(path, { method = 'GET', body, authenticated = true } = {}
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(12000)
+      signal: AbortSignal.timeout(timeout)
     });
   } catch (error) {
     if (error.name === 'TimeoutError') throw new Error('Сервер не ответил вовремя. Попробуйте ещё раз.');
@@ -35,7 +35,9 @@ async function request(path, { method = 'GET', body, authenticated = true } = {}
       401: authenticated ? 'Сеанс закончился. Войдите снова.' : 'Неверная почта или пароль.',
       404: 'Запись больше недоступна.',
       409: 'Данные уже существуют или изменились. Обновите страницу и повторите действие.',
-      422: 'Проверьте введённые данные.',
+      422: path.endsWith('/route') ? 'Не удалось построить путь между остановками. Проверьте выбранные места.' : 'Проверьте введённые данные, даты поездки и время остановок.',
+      403: 'Управление каталогом доступно только администратору.',
+      502: 'Сервис маршрутов вернул некорректный ответ.',
       503: 'Сервис пока недоступен. Попробуйте позже.'
     };
     if (data?.detail === 'Email already registered') messages[409] = 'Эта почта уже зарегистрирована. Войдите с этим адресом.';
@@ -75,6 +77,7 @@ function toItem(item) {
     id: String(item.id),
     placeId: String(item.place_id),
     position: item.position,
+    plannedTime: item.planned_time,
     visited: item.status === 'visited'
   };
 }
@@ -105,6 +108,36 @@ export const api = {
     });
     return toTrip(trip);
   },
+  async updateTrip(id, fields) {
+    return toTrip(await request(`/trips/${id}`, { method: 'PATCH', body: fields }));
+  },
+  reorder: (id, itemIds) => request(`/trips/${id}/items/order`, {
+    method: 'PUT', body: { item_ids: itemIds.map(Number) }
+  }),
+  planTime: (id, itemId, time) => request(`/trips/${id}/items/${itemId}`, {
+    method: 'PATCH', body: { planned_time: time }
+  }),
+  unvisit: (id, itemId) => request(`/trips/${id}/items/${itemId}/visit`, { method: 'DELETE' }),
+  notes: (id, itemId) => list(`/trips/${id}/items/${itemId}/notes`),
+  saveNote: (id, itemId, noteId, text) => request(
+    `/trips/${id}/items/${itemId}/notes${noteId ? '/' + noteId : ''}`,
+    { method: noteId ? 'PATCH' : 'POST', body: { text } }
+  ),
+  deleteNote: (id, itemId, noteId) => request(
+    `/trips/${id}/items/${itemId}/notes/${noteId}`, { method: 'DELETE' }
+  ),
+  async walkingRoute(id) {
+    try { return await request(`/trips/${id}/route`); }
+    catch (error) { if (error.status === 404) return null; throw error; }
+  },
+  calculateRoute: (id) => request(`/trips/${id}/route`, { method: 'POST', timeout: 30000 }),
+  saveCatalog: (cityId, placeId, body, place = false) => request(
+    `/admin/cities${cityId ? '/' + cityId : ''}${place ? '/places' + (placeId ? '/' + placeId : '') : ''}`,
+    { method: (place ? placeId : cityId) ? 'PATCH' : 'POST', body }
+  ),
+  deleteCatalog: (cityId, placeId) => request(
+    `/admin/cities/${cityId}${placeId ? '/places/' + placeId : ''}`, { method: 'DELETE' }
+  ),
   deleteTrip: (id) => request(`/trips/${id}`, { method: 'DELETE' }),
   async items(tripId) {
     return (await request(`/trips/${tripId}/items`)).map(toItem);
@@ -117,7 +150,7 @@ export const api = {
   }),
   progress: (tripId) => request(`/trips/${tripId}/progress`),
   visit: (tripId, itemId) => request(`/trips/${tripId}/items/${itemId}/visit`),
-  markVisit: (tripId, itemId) => request(`/trips/${tripId}/items/${itemId}/visit`, {
-    method: 'PUT', body: {}
+  markVisit: (tripId, itemId, rating = null) => request(`/trips/${tripId}/items/${itemId}/visit`, {
+    method: 'PUT', body: { rating }
   })
 };
