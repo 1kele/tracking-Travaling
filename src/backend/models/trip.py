@@ -1,7 +1,7 @@
-from datetime import date
+from datetime import date, datetime
 from enum import StrEnum
 
-from sqlalchemy import CheckConstraint, Enum, ForeignKey, String
+from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, JSON, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.models.base import Base
@@ -52,3 +52,8 @@ class Route(Base):
     )
     distance_km: Mapped[float]
     duration_minutes: Mapped[int]
+
+    stop_ids: Mapped[list[int] | None] = mapped_column(JSON)
+    geometry: Mapped[dict | None] = mapped_column(JSON)
+    provider: Mapped[str | None] = mapped_column(String(40))
+    calculated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

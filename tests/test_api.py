@@ -277,3 +277,67 @@ def test_admin_catalog_permissions_validation_and_references(api):
     client.post(f"trips/{trip['id']}/items", headers=ordinary, json={"place_id": place_id, "position": 1})
     assert client.delete(f"admin/cities/{city_id}", headers=admin).status_code == 409
     assert client.delete(f"admin/cities/{city_id}/places/{place_id}", headers=admin).status_code == 409
+
+
+def test_route_build_read_and_invalidation(api, monkeypatch):
+    from fastapi import HTTPException
+    from backend.routers.routes import routing_client
+    from backend.services.routing import WalkingPath
+
+    class FakeRoutingClient:
+        def calculate(self, points):
+            return WalkingPath(
+                distance=1250, duration=901,
+                geometry={"type": "LineString", "coordinates": [[lon, lat] for lat, lon in points]},
+            )
+
+    client, (city_id, place_id, _), sessions = api
+    monkeypatch.setitem(app.dependency_overrides, routing_client, FakeRoutingClient)
+    owner = login_as(client, "routes@example.com")
+    other = login_as(client, "routes-other@example.com")
+    trip = client.post("trips", headers=owner, json={
+        "city_id": city_id, "title": "Walking", "start_date": "2026-12-04", "end_date": "2026-12-06",
+    }).json()
+    path = f"trips/{trip['id']}"
+    assert client.get(f"{path}/route", headers=owner).status_code == 404
+    assert client.post(f"{path}/route", headers=owner).status_code == 422
+    items = [client.post(f"{path}/items", headers=owner, json={
+        "place_id": place_id, "position": pos,
+    }).json() for pos in (1, 2)]
+    assert client.post(f"{path}/route", headers=other).status_code == 404
+    built = client.post(f"{path}/route", headers=owner)
+    assert built.status_code == 200, built.text
+    route = built.json()
+    assert route["distance_km"] == 1.25
+    assert route["duration_minutes"] == 16
+    assert route["stop_ids"] == [item["id"] for item in items]
+    assert route["geometry"]["type"] == "LineString"
+    assert client.get(f"{path}/route", headers=owner).json() == route
+    assert client.post(f"{path}/route", headers=owner).json()["id"] == route["id"]
+
+    class FailedRoutingClient:
+        def calculate(self, points):
+            raise HTTPException(503, "Provider unavailable")
+
+    monkeypatch.setitem(app.dependency_overrides, routing_client, FailedRoutingClient)
+    assert client.post(f"{path}/route", headers=owner).status_code == 503
+    assert client.get(f"{path}/route", headers=owner).json()["id"] == route["id"]
+    monkeypatch.setitem(app.dependency_overrides, routing_client, FakeRoutingClient)
+    assert client.put(f"{path}/items/order", headers=owner, json={
+        "item_ids": [item["id"] for item in items][::-1],
+    }).status_code == 200
+    assert client.get(f"{path}/route", headers=owner).status_code == 404
+    assert client.post(f"{path}/route", headers=owner).status_code == 200
+
+    from sqlalchemy import update
+
+    async def promote():
+        async with sessions.begin() as session:
+            await session.execute(update(User).where(User.email == "routes-other@example.com").values(is_admin=True))
+
+    asyncio.run(promote())
+    assert client.patch(f"admin/cities/{city_id}/places/{place_id}", headers=other, json={"lat": 55.81}).status_code == 200
+    assert client.get(f"{path}/route", headers=owner).status_code == 404
+    assert client.post(f"{path}/route", headers=owner).status_code == 200
+    assert client.delete(f"{path}/items/{items[0]['id']}", headers=owner).status_code == 204
+    assert client.get(f"{path}/route", headers=owner).status_code == 404

@@ -32,3 +32,10 @@ class AuthSettings(BaseSettings):
     model_config = Settings.model_config
 
     JWT_SECRET: SecretStr | None = Field(default=None, min_length=32)
+
+
+class RoutingSettings(BaseSettings):
+    model_config = Settings.model_config
+
+    ROUTING_BASE_URL: str = "https://valhalla1.openstreetmap.de"
+    ROUTING_TIMEOUT_SECONDS: float = Field(default=12.0, gt=0, le=60)

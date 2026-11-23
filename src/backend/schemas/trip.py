@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -39,6 +39,10 @@ class RouteRead(BaseModel):
     trip_id: int
     distance_km: float
     duration_minutes: int
+    stop_ids: list[int] | None = None
+    geometry: dict | None = None
+    provider: str | None = None
+    calculated_at: datetime | None = None
 
 
 class TripUpdate(BaseModel):
