@@ -7,7 +7,8 @@ from backend.database import SessionDep
 from backend.models import City, Trip
 from backend.repositories.trips import find_owned_trip
 from backend.routers.params import ResourceId
-from backend.schemas.trip import TripCreate, TripRead
+from backend.schemas.trip import TripCreate, TripRead, TripUpdate
+from backend.services.trips import TripService
 from backend.security import CurrentUser
 
 router = APIRouter(prefix="/trips", tags=["trips"])
@@ -68,3 +69,8 @@ async def delete_trip(trip: LockedTrip, session: SessionDep) -> Response:
     await session.delete(trip)
     await session.commit()
     return Response(status_code=204)
+
+
+@router.patch("/{trip_id}", response_model=TripRead)
+async def update_trip(data: TripUpdate, trip: LockedTrip, session: SessionDep) -> Trip:
+    return await TripService(session).update(trip, data)

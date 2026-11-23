@@ -157,3 +157,26 @@ def test_trip_itinerary_visit_and_ownership(api):
     assert client.delete(item_url, headers=owner).status_code == 204
     assert client.delete(url, headers=owner).status_code == 204
     assert client.get(url, headers=owner).status_code == 404
+
+
+def test_trip_updates_and_status_transitions(api):
+    client, (city_id, _, _), _ = api
+    owner = login_as(client, "trip-editor@example.com")
+    other = login_as(client, "other-editor@example.com")
+    trip = client.post("trips", headers=owner, json={
+        "city_id": city_id, "title": "Original",
+        "start_date": "2026-12-04", "end_date": "2026-12-06",
+    }).json()
+    path = f"trips/{trip['id']}"
+    assert client.patch(path, headers=other, json={"title": "Stolen"}).status_code == 404
+    assert client.patch(path, headers=owner, json={"title": None}).status_code == 422
+    assert client.patch(path, headers=owner, json={}).status_code == 422
+    assert client.patch(path, headers=owner, json={"end_date": "2026-12-01"}).status_code == 422
+    assert client.patch(path, headers=owner, json={"status": "completed"}).status_code == 409
+    for status in ("in_progress", "completed", "planned"):
+        response = client.patch(path, headers=owner, json={"status": status})
+        assert response.status_code == 200, response.text
+        assert response.json()["status"] == status
+    result = client.patch(path, headers=owner, json={"title": "Updated"})
+    assert result.json()["title"] == "Updated"
+    assert client.get(path, headers=owner).json()["title"] == "Updated"

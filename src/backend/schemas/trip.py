@@ -39,3 +39,20 @@ class RouteRead(BaseModel):
     trip_id: int
     distance_km: float
     duration_minutes: int
+
+
+class TripUpdate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    title: str | None = Field(default=None, min_length=1, max_length=160)
+    start_date: date | None = None
+    end_date: date | None = None
+    status: TripStatus | None = None
+
+    @model_validator(mode="after")
+    def validate_changes(self) -> Self:
+        if not self.model_fields_set:
+            raise ValueError("Provide at least one field")
+        if any(getattr(self, name) is None for name in self.model_fields_set):
+            raise ValueError("Changed fields cannot be null")
+        return self
