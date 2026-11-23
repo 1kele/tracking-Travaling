@@ -341,3 +341,28 @@ def test_route_build_read_and_invalidation(api, monkeypatch):
     assert client.post(f"{path}/route", headers=owner).status_code == 200
     assert client.delete(f"{path}/items/{items[0]['id']}", headers=owner).status_code == 204
     assert client.get(f"{path}/route", headers=owner).status_code == 404
+
+
+def test_concurrent_reorders_keep_unique_positions(api):
+    from concurrent.futures import ThreadPoolExecutor
+
+    client, (city_id, place_id, _), _ = api
+    headers = login_as(client, "parallel-planner@example.com")
+    trip = client.post("trips", headers=headers, json={
+        "city_id": city_id, "title": "Concurrent order",
+        "start_date": "2026-12-04", "end_date": "2026-12-06",
+    }).json()
+    path = f"trips/{trip['id']}/items"
+    ids = [client.post(path, headers=headers, json={
+        "place_id": place_id, "position": pos,
+    }).json()["id"] for pos in (1, 2, 3)]
+
+    def reorder(order):
+        return client.put(f"{path}/order", headers=headers, json={"item_ids": order})
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        responses = list(executor.map(reorder, [ids[::-1], [ids[1], ids[2], ids[0]]]))
+    assert [response.status_code for response in responses] == [200, 200]
+    saved = client.get(path, headers=headers).json()
+    assert {item["id"] for item in saved} == set(ids)
+    assert [item["position"] for item in saved] == [1, 2, 3]
