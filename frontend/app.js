@@ -1,3 +1,4 @@
+import { createFeatures } from './features.js';
 import { api, clearSession, hasSession } from './api.js';
 
 (() => {
@@ -60,8 +61,15 @@ import { api, clearSession, hasSession } from './api.js';
   const visitDate = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium', timeStyle: 'short' });
   const navItems = [
     ['dashboard', 'grid', 'Обзор'], ['trips', 'suitcase', 'Мои поездки'],
-    ['explore', 'globe', 'Исследовать'], ['routes', 'map', 'Маршруты']
+    ['explore', 'globe', 'Исследовать'], ['routes', 'map', 'Маршруты'], ['catalog', 'settings', 'Каталог']
   ];
+
+  const features = createFeatures({ api, state, esc, selectedTrip, cityById,
+    loadItinerary, loadWorkspace, render, notify, openModal });
+
+  function renderCatalog() {
+    renderShell(features.catalog(), 'Каталог');
+  }
 
   function renderShell(content,title,subtitle='',right='') {
     root.innerHTML = `<div class="app-shell">
@@ -143,10 +151,10 @@ import { api, clearSession, hasSession } from './api.js';
     const routeItems = trip.items.map((item, index) => {
       const place = placeById(city, item.placeId);
       if (!place) return '';
-      const label = item.visited ? 'Место посещено' : 'Отметить как посещённое';
+      const label = item.visited ? 'Изменить посещение' : 'Отметить как посещённое';
       return `<article class="route-stop ${item.visited ? 'visited' : ''}">
-        <button class="stop-marker" data-action="mark-visit" data-id="${esc(item.id)}"
-                aria-label="${label}: ${esc(place.name)}" title="${label}" ${item.visited ? 'disabled' : ''}>
+        <button class="stop-marker" data-action="visit" data-id="${esc(item.id)}"
+                aria-label="${label}: ${esc(place.name)}" title="${label}">
           ${item.visited ? icon('check', 18) : index + 1}
         </button>
         <div class="stop-content">
@@ -154,14 +162,15 @@ import { api, clearSession, hasSession } from './api.js';
             <button class="mini-icon dangerous" data-action="remove-place" data-id="${esc(item.id)}"
                     aria-label="Удалить ${esc(place.name)}">${icon('close', 16)}</button>
           </div>
+          ${features.itemControls(item, index, trip.items.length)}
           <h4>${esc(place.name)}</h4><p>${esc(place.desc)}</p>
           ${item.visit ? `<p class="visit-detail">Посещено ${visitDate.format(new Date(item.visit.visited_at))}
             ${item.visit.rating === null ? '' : ` · Оценка ${esc(item.visit.rating)}/5`}</p>` : ''}
         </div>
       </article>`;
     }).join('');
-    const content=`<button class="back-link" data-action="nav" data-page="trips">${icon('arrowLeft',17)} Все поездки</button><div class="planner-banner"><div><span>${esc(city.emoji)} ${esc(city.country)} · ${displayDate(trip.startDate)} – ${displayDate(trip.endDate)}</span><h2>${esc(trip.title)}</h2><p>${dayCount(trip.startDate,trip.endDate)} дн. · ${trip.items.length} мест · ${complete} посещено</p></div><div class="planner-banner-actions"><button class="btn btn-lightoutline" data-action="confirm-delete">${icon('trash',16)} Удалить</button></div></div><div class="planner-layout"><div class="planner-left"><section class="panel route-panel"><div class="panel-head"><div><span class="eyebrow">ТВОЙ ПЛАН</span><h3>Маршрут по городу</h3></div><span class="small-count">${trip.items.length} остановок</span></div><div class="route-timeline">${routeItems||'<div class="empty-state small">В маршруте пока нет мест. Добавьте первую остановку ниже.</div>'}</div><div class="add-stop"><div><strong>Добавить остановку</strong><small>Выберите место из каталога</small></div><button class="small-add" data-action="add-place" ${!available.length?'disabled':''}>${icon('plus',17)} Добавить</button></div></section><section class="panel recommendations"><div class="panel-head"><div><span class="eyebrow">ИДЕИ ДЛЯ ВАС</span><h3>Места неподалёку</h3></div></div><div class="rec-list">${available.length?available.slice(0,3).map(p=>`<div class="rec-row"><span class="rec-emoji">${p.kind==='Музей'?'🏛️':p.kind==='Прогулка'?'🌿':'📍'}</span><div><strong>${esc(p.name)}</strong><small>${esc(p.kind)}</small></div><button data-action="quick-add" data-place="${esc(p.id)}" aria-label="Добавить ${esc(p.name)}">${icon('plus',17)}</button></div>`).join(''):'<p class="muted-empty">Все доступные места уже добавлены.</p>'}</div></section></div>
-    <div class="planner-right"><section class="panel progress-panel"><div class="panel-head"><div><span class="eyebrow">ДВИГАЙСЯ ВПЕРЁД</span><h3>Прогресс поездки</h3></div><strong class="large-percent">${progress(trip)}%</strong></div><div class="progress-track big"><span style="width:${progress(trip)}%"></span></div><div class="progress-summary"><span>${icon('circleCheck',17)} ${complete} посещено</span><span>${trip.stats.total-complete} осталось</span></div>${progress(trip)===100&&trip.items.length?'<p class="completion-note">✦ Отлично! Все места из маршрута посещены.</p>':''}</section></div></div>`;
+    const content=`<button class="back-link" data-action="nav" data-page="trips">${icon('arrowLeft',17)} Все поездки</button><div class="planner-banner"><div><span>${esc(city.emoji)} ${esc(city.country)} · ${displayDate(trip.startDate)} – ${displayDate(trip.endDate)}</span><h2>${esc(trip.title)}</h2><p>${dayCount(trip.startDate,trip.endDate)} дн. · ${trip.items.length} мест · ${complete} посещено</p></div><div class="planner-banner-actions">${features.tripControls(trip)}<button class="btn btn-lightoutline" data-action="confirm-delete">${icon('trash',16)} Удалить</button></div></div><div class="planner-layout"><div class="planner-left"><section class="panel route-panel"><div class="panel-head"><div><span class="eyebrow">ТВОЙ ПЛАН</span><h3>Маршрут по городу</h3></div><span class="small-count">${trip.items.length} остановок</span></div><div class="route-timeline">${routeItems||'<div class="empty-state small">В маршруте пока нет мест. Добавьте первую остановку ниже.</div>'}</div><div class="add-stop"><div><strong>Добавить остановку</strong><small>Выберите место из каталога</small></div><button class="small-add" data-action="add-place" ${!available.length?'disabled':''}>${icon('plus',17)} Добавить</button></div></section><section class="panel recommendations"><div class="panel-head"><div><span class="eyebrow">ИДЕИ ДЛЯ ВАС</span><h3>Места неподалёку</h3></div></div><div class="rec-list">${available.length?available.slice(0,3).map(p=>`<div class="rec-row"><span class="rec-emoji">${p.kind==='Музей'?'🏛️':p.kind==='Прогулка'?'🌿':'📍'}</span><div><strong>${esc(p.name)}</strong><small>${esc(p.kind)}</small></div><button data-action="quick-add" data-place="${esc(p.id)}" aria-label="Добавить ${esc(p.name)}">${icon('plus',17)}</button></div>`).join(''):'<p class="muted-empty">Все доступные места уже добавлены.</p>'}</div></section></div>
+    <div class="planner-right">${features.routePanel(trip)}<section class="panel progress-panel"><div class="panel-head"><div><span class="eyebrow">ДВИГАЙСЯ ВПЕРЁД</span><h3>Прогресс поездки</h3></div><strong class="large-percent">${progress(trip)}%</strong></div><div class="progress-track big"><span style="width:${progress(trip)}%"></span></div><div class="progress-summary"><span>${icon('circleCheck',17)} ${complete} посещено</span><span>${trip.stats.total-complete} осталось</span></div>${progress(trip)===100&&trip.items.length?'<p class="completion-note">✦ Отлично! Все места из маршрута посещены.</p>':''}</section></div></div>`;
     renderShell(content,'Мой маршрут','ПЛАНИРОВАНИЕ ПОЕЗДКИ');
   }
 
@@ -174,7 +183,10 @@ import { api, clearSession, hasSession } from './api.js';
     let title;
     let content;
 
-    if (state.modal === 'new-trip') {
+    const extraModal = features.modal();
+    if (extraModal) {
+      [title, content] = extraModal;
+    } else if (state.modal === 'new-trip') {
       title = 'Новая поездка';
       const cities = state.cities.map(city =>
         `<option value="${city.id}" ${city.id === state.draftCity ? 'selected' : ''}>${esc(city.name)}, ${esc(city.country)}</option>`
@@ -256,7 +268,7 @@ import { api, clearSession, hasSession } from './api.js';
     }
     const views = {
       dashboard: renderDashboard, trips: renderTrips, explore: renderExplore,
-      city: renderCity, planner: renderPlanner, routes: renderRoutes, profile: renderProfile
+      catalog: renderCatalog, city: renderCity, planner: renderPlanner, routes: renderRoutes, profile: renderProfile
     };
     views[state.page]();
   }
@@ -287,7 +299,7 @@ import { api, clearSession, hasSession } from './api.js';
       id: String(place.id),
       name: place.name,
       kind: place.category,
-      desc: place.address
+      desc: place.address, lat: place.lat, lon: place.lon
     }));
   }
 
@@ -302,6 +314,16 @@ import { api, clearSession, hasSession } from './api.js';
       await Promise.all(items.filter(item => item.visited).map(async item => {
         item.visit = await api.visit(trip.id, item.id);
       }));
+    }
+    if (includeVisits) {
+      try {
+        trip.walkingRoute = await api.walkingRoute(trip.id);
+        trip.walkingError = '';
+      } catch (error) {
+        if (error.status === 401) throw error;
+        trip.walkingRoute = null;
+        trip.walkingError = error.message;
+      }
     }
     trip.items = items;
     trip.stats = stats;
@@ -370,6 +392,10 @@ import { api, clearSession, hasSession } from './api.js';
       if (window.location.hash.slice(1) !== route) return;
     } else {
       state.page = section === 'profile' || navItems.some(([name]) => name === section) ? section : 'dashboard';
+    }
+    if (state.page === 'catalog') {
+      const city = cityById(state.catalogCity) || state.cities[0];
+      if (city) await loadPlaces(city);
     }
     render();
   }
@@ -481,6 +507,7 @@ import { api, clearSession, hasSession } from './api.js';
     if (isButton) element.disabled = true;
     try {
       const trip = selectedTrip();
+      if (await features.action(action, element)) return;
       switch (action) {
         case 'switch-auth':
           setAuthMode(
@@ -528,11 +555,6 @@ import { api, clearSession, hasSession } from './api.js';
           await loadItinerary(trip, true);
           notify('Место удалено из маршрута');
           break;
-        case 'mark-visit':
-          await api.markVisit(trip.id, element.dataset.id);
-          await loadItinerary(trip, true);
-          notify('Место отмечено как посещённое');
-          break;
         case 'delete-trip':
           await api.deleteTrip(trip.id);
           state.trips = state.trips.filter(item => item.id !== trip.id);
@@ -558,7 +580,7 @@ import { api, clearSession, hasSession } from './api.js';
 
   document.addEventListener('submit', async event => {
     const form = event.target;
-    if (form.id !== 'trip-form' && form.id !== 'auth-form') return;
+    if (!['trip-form', 'auth-form', 'feature-form'].includes(form.id)) return;
     event.preventDefault();
     if (working) return;
     working = true;
@@ -571,7 +593,9 @@ import { api, clearSession, hasSession } from './api.js';
     for (const message of form.querySelectorAll('.form-error')) message.hidden = true;
     for (const input of form.querySelectorAll('[aria-invalid]')) input.removeAttribute('aria-invalid');
     try {
-      if (form.id === 'auth-form') {
+      if (form.id === 'feature-form') {
+        await features.submit(form);
+      } else if (form.id === 'auth-form') {
         const email = fields.get('email').trim();
         const password = fields.get('password');
         const registering = state.authMode === 'register';
@@ -607,6 +631,15 @@ import { api, clearSession, hasSession } from './api.js';
       submit.textContent = label.trim();
       working = false;
     }
+  });
+
+  document.addEventListener('change', async event => {
+    if (event.target.id !== 'catalog-city' || working) return;
+    state.catalogCity = event.target.value;
+    try {
+      await loadPlaces(cityById(state.catalogCity));
+      render();
+    } catch (error) { reportError(error); }
   });
 
   document.addEventListener('input', event => {
