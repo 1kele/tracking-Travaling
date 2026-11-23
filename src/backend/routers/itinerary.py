@@ -7,11 +7,15 @@ from backend.routers.params import ResourceId
 from backend.routers.trips import LockedTrip, OwnedTrip
 from backend.schemas.itinerary import (
     ItineraryItemCreate,
+    ItineraryItemUpdate,
+    ItineraryOrder,
     ItineraryItemRead,
     TripProgress,
     VisitCreate,
     VisitRead,
 )
+
+from backend.services.itinerary import ItineraryService
 
 router = APIRouter(prefix="/trips/{trip_id}", tags=["itinerary"])
 
@@ -37,6 +41,8 @@ async def list_items(trip: OwnedTrip, session: SessionDep) -> list[ItineraryItem
 async def add_item(
     data: ItineraryItemCreate, trip: LockedTrip, session: SessionDep
 ) -> ItineraryItem:
+    service = ItineraryService(session)
+    service.validate_time(trip, data.planned_time)
     place = await session.get(Place, data.place_id)
     if place is None or place.city_id != trip.city_id:
         raise HTTPException(status_code=404, detail="Place not found in trip city")
@@ -49,6 +55,7 @@ async def add_item(
         raise HTTPException(status_code=409, detail="Position already occupied")
     item = ItineraryItem(trip_id=trip.id, **data.model_dump())
     session.add(item)
+    await service.invalidate_route(trip.id)
     await session.commit()
     return item
 
@@ -56,6 +63,7 @@ async def add_item(
 @router.delete("/items/{item_id}", status_code=204)
 async def remove_item(item_id: ResourceId, trip: LockedTrip, session: SessionDep) -> Response:
     await session.delete(await trip_item(item_id, trip, session))
+    await ItineraryService(session).invalidate_route(trip.id)
     await session.commit()
     return Response(status_code=204)
 
@@ -96,3 +104,27 @@ async def get_progress(trip: OwnedTrip, session: SessionDep) -> TripProgress:
     total, visited = (await session.execute(statement)).one()
     percent = round(visited * 100 / total, 2) if total else 0.0
     return TripProgress(total=total, visited=visited, percent=percent)
+
+
+@router.put("/items/order", response_model=list[ItineraryItemRead])
+async def reorder_items(
+    data: ItineraryOrder, trip: LockedTrip, session: SessionDep
+) -> list[ItineraryItem]:
+    return await ItineraryService(session).reorder(trip, data.item_ids)
+
+
+@router.patch("/items/{item_id}", response_model=ItineraryItemRead)
+async def update_item(
+    item_id: ResourceId, data: ItineraryItemUpdate, trip: LockedTrip, session: SessionDep
+) -> ItineraryItem:
+    ItineraryService.validate_time(trip, data.planned_time)
+    item = await trip_item(item_id, trip, session)
+    item.planned_time = data.planned_time
+    await session.commit()
+    return item
+
+
+@router.delete("/items/{item_id}/visit", status_code=204)
+async def unvisit_item(item_id: ResourceId, trip: LockedTrip, session: SessionDep) -> Response:
+    await ItineraryService(session).unvisit(await trip_item(item_id, trip, session))
+    return Response(status_code=204)

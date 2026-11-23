@@ -1,4 +1,6 @@
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
+from typing import Self
+
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
 from backend.models import ItemStatus
 
@@ -47,3 +49,21 @@ class TripProgress(BaseModel):
     total: int
     visited: int
     percent: float
+
+
+class ItineraryItemUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    planned_time: AwareDatetime | None
+
+
+class ItineraryOrder(BaseModel):
+    item_ids: list[int] = Field(min_length=1, max_length=500)
+
+    @model_validator(mode="after")
+    def validate_ids(self) -> Self:
+        if any(not 1 <= item <= 2_147_483_647 for item in self.item_ids):
+            raise ValueError("Invalid item ID")
+        if len(set(self.item_ids)) != len(self.item_ids):
+            raise ValueError("Each item must occur exactly once")
+        return self

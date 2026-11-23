@@ -180,3 +180,35 @@ def test_trip_updates_and_status_transitions(api):
     result = client.patch(path, headers=owner, json={"title": "Updated"})
     assert result.json()["title"] == "Updated"
     assert client.get(path, headers=owner).json()["title"] == "Updated"
+
+
+def test_reorder_planned_times_and_unvisit(api):
+    client, (city_id, place_id, _), _ = api
+    owner = login_as(client, "planner@example.com")
+    other = login_as(client, "planner-other@example.com")
+    trip = client.post("trips", headers=owner, json={
+        "city_id": city_id, "title": "Stops",
+        "start_date": "2026-12-04", "end_date": "2026-12-06",
+    }).json()
+    path = f"trips/{trip['id']}"
+    items = [client.post(f"{path}/items", headers=owner, json={
+        "place_id": place_id, "position": position,
+    }).json() for position in (1, 2, 3)]
+    ids = [item["id"] for item in items]
+    assert client.put(f"{path}/items/order", headers=other, json={"item_ids": ids}).status_code == 404
+    assert client.put(f"{path}/items/order", headers=owner, json={"item_ids": [ids[0]]}).status_code == 409
+    assert client.put(f"{path}/items/order", headers=owner, json={"item_ids": [ids[0], ids[0]]}).status_code == 422
+    response = client.put(f"{path}/items/order", headers=owner, json={"item_ids": ids[::-1]})
+    assert response.status_code == 200, response.text
+    assert [item["id"] for item in response.json()] == ids[::-1]
+    assert [item["position"] for item in response.json()] == [1, 2, 3]
+    item_path = f"{path}/items/{ids[0]}"
+    assert client.patch(item_path, headers=owner, json={"planned_time": "2026-12-07T12:00:00Z"}).status_code == 422
+    assert client.patch(item_path, headers=owner, json={"planned_time": "2026-12-04T12:00:00Z"}).status_code == 200
+    assert client.patch(path, headers=owner, json={"start_date": "2026-12-05"}).status_code == 409
+    assert client.patch(item_path, headers=owner, json={"planned_time": None}).status_code == 200
+    assert client.put(f"{item_path}/visit", headers=owner, json={"rating": 4}).status_code == 200
+    for _ in range(2):
+        assert client.delete(f"{item_path}/visit", headers=owner).status_code == 204
+    assert client.get(f"{item_path}/visit", headers=owner).status_code == 404
+    assert client.get(f"{path}/progress", headers=owner).json()["visited"] == 0
