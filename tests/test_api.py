@@ -212,3 +212,30 @@ def test_reorder_planned_times_and_unvisit(api):
         assert client.delete(f"{item_path}/visit", headers=owner).status_code == 204
     assert client.get(f"{item_path}/visit", headers=owner).status_code == 404
     assert client.get(f"{path}/progress", headers=owner).json()["visited"] == 0
+
+
+def test_notes_ownership_validation_and_cascade(api):
+    client, (city_id, place_id, _), _ = api
+    owner = login_as(client, "notes@example.com")
+    other = login_as(client, "notes-other@example.com")
+    trip = client.post("trips", headers=owner, json={
+        "city_id": city_id, "title": "Notes", "start_date": "2026-12-04", "end_date": "2026-12-06",
+    }).json()
+    item = client.post(f"trips/{trip['id']}/items", headers=owner, json={
+        "place_id": place_id, "position": 1,
+    }).json()
+    path = f"trips/{trip['id']}/items/{item['id']}/notes"
+    assert client.post(path, headers=owner, json={"text": " "}).status_code == 422
+    response = client.post(path, headers=owner, json={"text": "  Great place  "})
+    assert response.status_code == 201, response.text
+    note = response.json()
+    assert note["text"] == "Great place"
+    assert client.get(path, headers=other).status_code == 404
+    assert client.patch(f"{path}/{note['id']}", headers=other, json={"text": "stolen"}).status_code == 404
+    assert client.patch(f"{path}/{note['id']}", headers=owner, json={"text": "Updated"}).json()["text"] == "Updated"
+    assert client.get(path, headers=owner).json()[0]["text"] == "Updated"
+    assert client.delete(f"{path}/{note['id']}", headers=owner).status_code == 204
+    assert client.get(path, headers=owner).json() == []
+    client.post(path, headers=owner, json={"text": "Cascade"})
+    assert client.delete(f"trips/{trip['id']}", headers=owner).status_code == 204
+    assert client.get(path, headers=owner).status_code == 404

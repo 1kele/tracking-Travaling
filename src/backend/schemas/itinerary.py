@@ -67,3 +67,9 @@ class ItineraryOrder(BaseModel):
         if len(set(self.item_ids)) != len(self.item_ids):
             raise ValueError("Each item must occur exactly once")
         return self
+
+
+class NoteWrite(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    text: str = Field(min_length=1, max_length=5000)
