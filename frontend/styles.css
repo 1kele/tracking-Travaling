@@ -26,3 +26,11 @@
 }
 .initial-status { padding: 24px; }
 .form-error { margin: 0; color: #9a2929; }
+
+.planner-banner-actions{flex-wrap:wrap}.planner-banner-actions .btn-outline{background:#fff;color:#335d51}
+.stop-bottom .btn{padding:6px 8px;font-size:11px}.notes-list{display:grid;gap:12px;margin:16px 0}
+.notes-list p{white-space:pre-wrap;overflow-wrap:anywhere}.notes-list .btn{padding:7px 10px;margin-top:8px}
+.walking-geometry{display:block;width:100%;max-height:340px;background:#f3f7f0;border-radius:12px}
+.catalog-actions{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}
+#catalog-city{display:block;max-width:100%;padding:10px;margin-top:10px}
+#feature-form textarea{width:100%;padding:12px;border:1px solid #d7e6d4;border-radius:8px;resize:vertical}
